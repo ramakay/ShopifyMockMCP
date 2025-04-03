@@ -30,6 +30,11 @@ This server is built using Next.js and runs as an HTTP service.
     ```
     (Replace `<PORT>` with your desired port, e.g., `52000`. Defaults to `3000` if `-p` is omitted). The MCP endpoint will be available at `http://localhost:<PORT>/api/mcp`.
 
+## Deploy Your Own Instance
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Framakay%2FShopifyMockMCP&env=SHOPIFY_STORE,SHOPIFY_ACCESS_TOKEN,SHOPIFY_VERSION,USE_ADMIN_API,ADMIN_ACCESS_TOKEN,ADMIN_VERSION&project-name=shopify-mcp-proxy&repository-name=shopify-mcp-proxy&root-directory=app)
+
+Click the button above to deploy your own instance of this server to Vercel. You will be prompted to enter the required environment variables during the setup process.
 ## Usage with Cursor or Claude Desktop
 
 Add the following configuration to your client, replacing the URL with your local or deployed endpoint. For more information, read the [Cursor MCP documentation](https://docs.cursor.com/context/model-context-protocol) or the [Claude Desktop MCP guide](https://modelcontextprotocol.io/quickstart/user).
