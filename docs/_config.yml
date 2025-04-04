@@ -7,4 +7,10 @@ baseurl: "/ShopifyMCPMockShop" # the subpath of your site
 url: "https://ramakay.github.io" # the base hostname & protocol
 
 # Theme
-theme: just-the-docs
+theme: jekyll-theme-minimal
+
+# Plugins
+plugins:
+  - jekyll-remote-theme
+  - jekyll-seo-tag
+  - jekyll-github-metadata
