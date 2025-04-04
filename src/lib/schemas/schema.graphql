@@ -1,0 +1,11 @@
+# Placeholder for Shopify Storefront GraphQL Schema
+# This file will be replaced by the actual introspected schema in Task 14.
+
+type Query {
+  shop: Shop!
+}
+
+type Shop {
+  name: String!
+  description: String
+}

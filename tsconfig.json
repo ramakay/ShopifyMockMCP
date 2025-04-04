@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    /* Base Options */
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "target": "ES2022", // Target modern Node.js versions
+    "allowJs": true,
+    "resolveJsonModule": true,
+    "moduleDetection": "force",
+    "isolatedModules": true,
+
+    /* Strictness */
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitAny": true,
+
+    /* Bundled Modules */
+    "module": "NodeNext", // Use NodeNext for modern Node.js module resolution
+    "moduleResolution": "NodeNext",
+    "outDir": "./dist", // Output directory for compiled JS
+    "rootDir": "./src", // Source directory
+
+    /* Linting */
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src/**/*.ts"], // Include all TS files in src
+  "exclude": ["node_modules", "dist", "app", "localdocs", "Requirements"] // Exclude other directories
+}

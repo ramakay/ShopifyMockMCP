@@ -1,0 +1,41 @@
+# Placeholder for Shopify Admin GraphQL Schema
+# This file will be replaced by the actual introspected schema in Task 14.
+# Only relevant if Admin API is enabled.
+
+type Query {
+  shop: AdminShop!
+}
+
+type Mutation {
+  # Example mutation
+  productCreate(input: ProductInput!): ProductCreatePayload
+}
+
+type AdminShop {
+  name: String!
+  plan: ShopPlan
+}
+
+type ShopPlan {
+  displayName: String!
+}
+
+input ProductInput {
+  title: String!
+  vendor: String
+}
+
+type ProductCreatePayload {
+  product: Product
+  userErrors: [UserError!]!
+}
+
+type Product {
+  id: ID!
+  title: String!
+}
+
+type UserError {
+  field: [String!]
+  message: String!
+}

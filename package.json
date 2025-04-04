@@ -1,0 +1,50 @@
+{
+  "name": "@ramakay/shopify-mcp-proxy",
+  "version": "0.1.0",
+  "description": "MCP Server providing proxy access to Shopify Storefront/Admin APIs with mock.shop support.",
+  "main": "dist/server.js",
+  "type": "module",
+  "bin": {
+    "shopify-mcp-proxy": "dist/server.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "tsc --watch & node --watch dist/server.js",
+    "prepublishOnly": "npm run build",
+    "inspect": "npx @modelcontextprotocol/inspector node dist/server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ramakay/ShopifyMockMCP.git"
+  },
+  "keywords": [
+    "mcp",
+    "modelcontextprotocol",
+    "shopify",
+    "proxy",
+    "mock.shop"
+  ],
+  "author": "ramakay",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ramakay/ShopifyMockMCP/issues"
+  },
+  "homepage": "https://github.com/ramakay/ShopifyMockMCP#readme",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.6.1",
+    "graphql": "^16.10.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "typescript": "^5"
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "!dist/**/*.test.*",
+    "LICENSE",
+    "README.md"
+  ]
+}
