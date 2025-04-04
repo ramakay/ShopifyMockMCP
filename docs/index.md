@@ -9,6 +9,8 @@ nav_order: 1
 This project implements a Model Context Protocol (MCP) server that acts as an intelligent bridge and proxy to Shopify's Storefront API. It uniquely supports `mock.shop` for safe development and testing without requiring real store credentials.
 
 The server communicates via **Standard Input/Output (stdio)**, making it suitable for local integration with clients like Claude Desktop and Cursor.
+
+
 ## Motivation
  
 Generic AI developer tools and off-the-shelf MCP servers often promise much but can lack the transparency, safety mechanisms (like explicit `ToolAnnotations`), stability, or specific features needed for controlled development and testing, especially against rapidly evolving APIs like Shopify's.
