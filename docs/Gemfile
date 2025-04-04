@@ -1,0 +1,8 @@
+source "https://rubygems.org"
+
+gem "jekyll", "~> 3.9" # Or a specific version compatible with GitHub Pages
+gem "just-the-docs"
+
+# Optional: GitHub Pages often uses these, good to include
+gem "wdm", "~> 0.1.1", :install_if => Gem.win_platform?
+gem "jekyll-feed", "~> 0.12"
