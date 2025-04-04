@@ -1,3 +1,9 @@
+---
+layout: default
+title: Home
+nav_order: 1
+---
+
 # Shopify MCP Proxy & Mock Server (ShopifyMCPMockShop)
 
 This project implements a Model Context Protocol (MCP) server that acts as an intelligent bridge and proxy to Shopify's Storefront API. It uniquely supports `mock.shop` for safe development and testing without requiring real store credentials.

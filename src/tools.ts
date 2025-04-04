@@ -1,42 +1,44 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"; // Removed McpToolHandlerResult
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+// No axios needed for this approach
 import { z } from "zod";
-import { proxyStorefrontRequest, proxyAdminRequest } from "./lib/shopifyProxy.js";
-import { appConfig } from "./lib/config.js";
+import { proxyStorefrontRequest } from "./lib/shopifyProxy.js";
+// import { appConfig } from "./lib/config.js"; // Not needed if Admin tools are omitted
 
-// ToolAnnotations type definition removed as it's not directly used in tool registration for this SDK version.
-// Annotations are documented in comments for now.
+// --- Define Content Block Types ---
+// Only TextContentBlock needed
+type TextContentBlock = {
+    type: "text";
+    text: string;
+};
 
-// Helper to create text content for the result
-// Define return type structure expected by SDK handler
-type McpToolHandlerResultContent = { content: { type: "text"; text: string }[] };
+// Define the overall result structure
+type McpToolResult = { content: TextContentBlock[] };
 
-function textResult(text: string): McpToolHandlerResultContent {
+// --- Helper Functions ---
+
+function textResult(text: string): McpToolResult {
     return { content: [{ type: "text", text }] };
 }
 
-// Helper to create JSON content for the result
-function jsonResult(data: unknown): McpToolHandlerResultContent {
+// jsonResult returns the data within a text block
+function jsonResult(data: unknown): McpToolResult {
     try {
-        // Attempt to stringify, useful for direct API responses
         const jsonString = JSON.stringify(data, null, 2);
         return { content: [{ type: "text", text: `\`\`\`json\n${jsonString}\n\`\`\`` }] };
     } catch (e) {
-        console.error(`[${new Date().toISOString()}] ERROR: Failed to stringify result data:`, e); // Added prefix
-        // Fallback for non-serializable data
+        console.error(`[${new Date().toISOString()}] ERROR: Failed to stringify result data:`, e);
         return textResult(`Error: Could not serialize result data.`);
     }
 }
 
-// Helper to handle proxy results consistently
-function handleProxyResult(proxyResult: { success: boolean; data: unknown }): McpToolHandlerResultContent {
+// handleProxyResult uses jsonResult
+function handleProxyResult(proxyResult: { success: boolean; data: unknown }): McpToolResult {
     if (proxyResult.success) {
         return jsonResult(proxyResult.data);
     } else {
-        // Extract error message if possible
         interface ErrorResponse { errors?: [{ message?: string }] }
         const errorData = proxyResult.data as ErrorResponse;
         const message = errorData?.errors?.[0]?.message || 'Tool execution failed via proxy.';
-        // Throwing an error here will be caught by the SDK and formatted as a JSON-RPC error
         throw new Error(message);
     }
 }
@@ -48,13 +50,11 @@ export function registerShopifyTools(server: McpServer) {
 
     server.tool(
         "getShopInfo",
-        "Fetches basic information about the configured Shopify shop (name, description, currency). Uses the Storefront API.",
-        {}, // Empty object for no input arguments
-        // { annotations: { readonly: true } satisfies ToolAnnotations }, // Removed options object
+        "Fetches basic information about the configured Shopify shop.",
+        {},
         async () => {
-            // Corrected query: Use paymentSettings.currencyCode instead of shop.currencyCode
             const graphQLPayload = { query: `query ShopInfo { shop { name description paymentSettings { currencyCode } } }` };
-            console.error(`[${new Date().toISOString()}] INFO: [tool:getShopInfo] Executing...`); // Added timestamp
+            console.error(`[${new Date().toISOString()}] INFO: [tool:getShopInfo] Executing...`);
             const proxyResult = await proxyStorefrontRequest(graphQLPayload);
             return handleProxyResult(proxyResult);
         }
@@ -62,16 +62,15 @@ export function registerShopifyTools(server: McpServer) {
 
     server.tool(
         "getProductById",
-        "Fetches a specific product by its ID, optionally including variants and images. Uses the Storefront API.",
-        { // Raw shape for input arguments
+        "Fetches product by ID. If includeImages=true, also returns the URL of the first image (resized to 75px).",
+        {
             productId: z.string().describe("The GID of the product (e.g., 'gid://shopify/Product/123')."),
             includeVariants: z.boolean().optional().default(false).describe("Whether to include product variants."),
             variantCount: z.number().int().positive().optional().default(5).describe("Maximum number of variants to return."),
-            includeImages: z.boolean().optional().default(false).describe("Whether to include product images."),
-            imageCount: z.number().int().positive().optional().default(5).describe("Maximum number of images to return."),
+            includeImages: z.boolean().optional().default(false).describe("Return first image URL (75px)?"),
         },
-        // { annotations: { readonly: true } satisfies ToolAnnotations }, // Removed options object
-        async ({ productId, includeVariants, variantCount, includeImages, imageCount }) => {
+        async ({ productId, includeVariants, variantCount, includeImages }) => {
+            const imageCountForQuery = includeImages ? 1 : 0; // Only need URL if requested
             const query = `query GetProduct($productId: ID!, $variantCount: Int!, $imageCount: Int!) {
               product(id: $productId) {
                 id
@@ -82,24 +81,62 @@ export function registerShopifyTools(server: McpServer) {
                 ${includeImages ? `images(first: $imageCount) { edges { node { id url altText width height } } }` : ''}
               }
             }`;
-            const graphQLPayload = { query, variables: { productId, variantCount, imageCount } };
-            console.error(`[${new Date().toISOString()}] INFO: [tool:getProductById] Executing for ID: ${productId}`); // Added timestamp
+            const graphQLPayload = { query, variables: { productId, variantCount, imageCount: imageCountForQuery } };
+            console.error(`[${new Date().toISOString()}] INFO: [tool:getProductById] Executing for ID: ${productId}`);
             const proxyResult = await proxyStorefrontRequest(graphQLPayload);
-            return handleProxyResult(proxyResult);
+
+            // If successful AND image URL requested
+            if (proxyResult.success && includeImages) {
+                 interface ProductData { // Define expected structure
+                    id?: string;
+                    title?: string;
+                    descriptionHtml?: string;
+                    vendor?: string;
+                    variants?: { edges: any[] };
+                    images?: { edges: { node: { url: string; altText?: string; width?: number; height?: number } }[] };
+                }
+                const responseData = proxyResult.data as { data?: { product?: ProductData } };
+                const product = responseData?.data?.product;
+                const firstImageEdge = product?.images?.edges?.[0];
+
+                if (product && firstImageEdge) {
+                    const img = firstImageEdge.node;
+                    const contentBlocks: TextContentBlock[] = [];
+
+                    // Create productInfo copy for JSON, excluding images array
+                    const productInfoForJson = { ...product };
+                    delete productInfoForJson.images;
+
+                    // Add JSON details block
+                    contentBlocks.push({ type: "text", text: `Product Details:\n\`\`\`json\n${JSON.stringify(productInfoForJson, null, 2)}\n\`\`\`` });
+
+                    // Construct resized image URL
+                    const separator = img.url.includes('?') ? '&' : '?';
+                    const resizedImageUrl = `${img.url}${separator}width=75`; // Use width=75
+
+                    // Add the resized image URL as a separate text block
+                    contentBlocks.push({ type: "text", text: `Image URL (75px): ${resizedImageUrl}` });
+
+                    console.error(`[${new Date().toISOString()}] INFO: [getProductById] Returning product JSON and resized image URL.`);
+                    return { content: contentBlocks };
+                }
+            }
+            // Fallback if no images requested/found or if proxy failed
+            return handleProxyResult(proxyResult); // Returns original data wrapped by jsonResult
         }
     );
 
+    // Add other Storefront tools back (omitting Admin tools for now)
     server.tool(
         "findProducts",
         "Searches or filters products with pagination and sorting. Uses the Storefront API.",
-        { // Raw shape for input arguments
+        {
             query: z.string().optional().describe("The search query string."),
             first: z.number().int().positive().optional().default(10).describe("Number of products per page."),
             after: z.string().optional().describe("Cursor for pagination (from previous pageInfo.endCursor)."),
             sortKey: z.enum(['RELEVANCE', 'TITLE', 'PRICE', 'CREATED_AT', 'UPDATED_AT', 'BEST_SELLING', 'PRODUCT_TYPE', 'VENDOR']).optional().default('RELEVANCE').describe("Sort key (e.g., TITLE, PRICE)."),
             reverse: z.boolean().optional().default(false).describe("Reverse the sort order."),
         },
-        // { annotations: { readonly: true } satisfies ToolAnnotations }, // Removed options object
         async ({ query: searchQuery, first, after, sortKey, reverse }) => {
              const query = `
                 query FindProducts($first: Int!, $after: String, $query: String, $sortKey: ProductSortKeys, $reverse: Boolean) {
@@ -119,7 +156,7 @@ export function registerShopifyTools(server: McpServer) {
                 }
             `;
             const graphQLPayload = { query, variables: { first, after, query: searchQuery, sortKey, reverse } };
-            console.error(`[${new Date().toISOString()}] INFO: [tool:findProducts] Executing with query: ${searchQuery}`); // Added timestamp
+            console.error(`[${new Date().toISOString()}] INFO: [tool:findProducts] Executing with query: ${searchQuery}`);
             const proxyResult = await proxyStorefrontRequest(graphQLPayload);
             return handleProxyResult(proxyResult);
         }
@@ -128,12 +165,11 @@ export function registerShopifyTools(server: McpServer) {
      server.tool(
         "getCollectionById",
         "Fetches a specific collection by its ID, optionally including products. Uses the Storefront API.",
-        { // Raw shape for input arguments
+        {
             collectionId: z.string().describe("The GID of the collection (e.g., 'gid://shopify/Collection/123')."),
             includeProducts: z.boolean().optional().default(false).describe("Whether to include products in the collection."),
             productCount: z.number().int().positive().optional().default(10).describe("Maximum number of products to return."),
         },
-        // { annotations: { readonly: true } satisfies ToolAnnotations }, // Removed options object
         async ({ collectionId, includeProducts, productCount }) => {
             const query = `
                 query GetCollection($collectionId: ID!, $productCount: Int!) {
@@ -147,7 +183,7 @@ export function registerShopifyTools(server: McpServer) {
                 }
             `;
             const graphQLPayload = { query, variables: { collectionId, productCount } };
-            console.error(`[${new Date().toISOString()}] INFO: [tool:getCollectionById] Executing for ID: ${collectionId}`); // Added timestamp
+            console.error(`[${new Date().toISOString()}] INFO: [tool:getCollectionById] Executing for ID: ${collectionId}`);
             const proxyResult = await proxyStorefrontRequest(graphQLPayload);
             return handleProxyResult(proxyResult);
         }
@@ -156,14 +192,13 @@ export function registerShopifyTools(server: McpServer) {
     server.tool(
         "findCollections",
         "Searches or filters collections with pagination and sorting. Uses the Storefront API.",
-         { // Raw shape for input arguments
+         {
             query: z.string().optional().describe("The search query string."),
             first: z.number().int().positive().optional().default(10).describe("Number of collections per page."),
             after: z.string().optional().describe("Cursor for pagination (from previous pageInfo.endCursor)."),
             sortKey: z.enum(['RELEVANCE', 'TITLE', 'UPDATED_AT']).optional().default('RELEVANCE').describe("Sort key (e.g., TITLE, UPDATED_AT)."),
             reverse: z.boolean().optional().default(false).describe("Reverse the sort order."),
         },
-        // { annotations: { readonly: true } satisfies ToolAnnotations }, // Removed options object
         async ({ query: searchQuery, first, after, sortKey, reverse }) => {
             const query = `
                 query FindCollections($first: Int!, $after: String, $query: String, $sortKey: CollectionSortKeys, $reverse: Boolean) {
@@ -182,14 +217,13 @@ export function registerShopifyTools(server: McpServer) {
                 }
             `;
             const graphQLPayload = { query, variables: { first, after, query: searchQuery, sortKey, reverse } };
-            console.error(`[${new Date().toISOString()}] INFO: [tool:findCollections] Executing with query: ${searchQuery}`); // Added timestamp
+            console.error(`[${new Date().toISOString()}] INFO: [tool:findCollections] Executing with query: ${searchQuery}`);
             const proxyResult = await proxyStorefrontRequest(graphQLPayload);
             return handleProxyResult(proxyResult);
         }
     );
 
     // --- Cart Tools ---
-    // Define Zod schemas for complex inputs
     const CartLineInputSchema = z.object({
         merchandiseId: z.string().describe("The GID of the product variant."),
         quantity: z.number().int().positive().describe("The quantity of the variant."),
@@ -200,7 +234,6 @@ export function registerShopifyTools(server: McpServer) {
         email: z.string().email().optional(),
         phone: z.string().optional(),
         countryCode: z.string().length(2).optional().describe("ISO 3166-1 alpha-2 country code."),
-        // Add other fields like customerAccessToken if needed
     }).describe("Input for buyer identity information.");
 
     const AttributeInputSchema = z.object({
@@ -211,12 +244,11 @@ export function registerShopifyTools(server: McpServer) {
     server.tool(
         "cartCreate",
         "Creates a new shopping cart. Uses the Storefront API.",
-        { // Raw shape for input arguments
+        {
             lines: z.array(CartLineInputSchema).optional().describe("Initial line items to add to the cart."),
             buyerIdentity: CartBuyerIdentityInputSchema.optional().describe("Information about the buyer."),
             attributes: z.array(AttributeInputSchema).optional().describe("Custom attributes for the cart."),
         },
-        // { annotations: { readonly: false, destructive: false, idempotent: false } satisfies ToolAnnotations }, // Removed options object
         async ({ lines, buyerIdentity, attributes }) => {
             const mutation = `
                 mutation CartCreate($input: CartInput!) {
@@ -232,7 +264,7 @@ export function registerShopifyTools(server: McpServer) {
             if (attributes) input.attributes = attributes;
 
             const graphQLPayload = { query: mutation, variables: { input } };
-            console.error(`[${new Date().toISOString()}] INFO: [tool:cartCreate] Executing...`); // Added timestamp
+            console.error(`[${new Date().toISOString()}] INFO: [tool:cartCreate] Executing...`);
             const proxyResult = await proxyStorefrontRequest(graphQLPayload);
             return handleProxyResult(proxyResult);
         }
@@ -241,11 +273,10 @@ export function registerShopifyTools(server: McpServer) {
      server.tool(
         "cartLinesAdd",
         "Adds line items to an existing shopping cart. Uses the Storefront API.",
-        { // Raw shape for input arguments
+        {
             cartId: z.string().describe("The GID of the cart to modify."),
             lines: z.array(CartLineInputSchema).min(1).describe("Line items to add."),
         },
-        // { annotations: { readonly: false, destructive: false, idempotent: false } satisfies ToolAnnotations }, // Removed options object
         async ({ cartId, lines }) => {
              const mutation = `
                 mutation CartLinesAdd($cartId: ID!, $lines: [CartLineInput!]!) {
@@ -256,7 +287,7 @@ export function registerShopifyTools(server: McpServer) {
                 }
             `;
             const graphQLPayload = { query: mutation, variables: { cartId, lines } };
-            console.error(`[${new Date().toISOString()}] INFO: [tool:cartLinesAdd] Executing for cart ID: ${cartId}`); // Added timestamp
+            console.error(`[${new Date().toISOString()}] INFO: [tool:cartLinesAdd] Executing for cart ID: ${cartId}`);
             const proxyResult = await proxyStorefrontRequest(graphQLPayload);
             return handleProxyResult(proxyResult);
         }
@@ -272,11 +303,10 @@ export function registerShopifyTools(server: McpServer) {
     server.tool(
         "cartLinesUpdate",
         "Updates line items (e.g., quantity) in an existing shopping cart. Uses the Storefront API.",
-        { // Raw shape for input arguments
+        {
             cartId: z.string().describe("The GID of the cart to modify."),
             lines: z.array(CartLineUpdateInputSchema).min(1).describe("Line items to update."),
         },
-        // { annotations: { readonly: false, destructive: false, idempotent: true } satisfies ToolAnnotations }, // Removed options object
         async ({ cartId, lines }) => {
             const mutation = `
                 mutation CartLinesUpdate($cartId: ID!, $lines: [CartLineUpdateInput!]!) {
@@ -287,7 +317,7 @@ export function registerShopifyTools(server: McpServer) {
                 }
             `;
             const graphQLPayload = { query: mutation, variables: { cartId, lines } };
-            console.error(`[${new Date().toISOString()}] INFO: [tool:cartLinesUpdate] Executing for cart ID: ${cartId}`); // Added timestamp
+            console.error(`[${new Date().toISOString()}] INFO: [tool:cartLinesUpdate] Executing for cart ID: ${cartId}`);
             const proxyResult = await proxyStorefrontRequest(graphQLPayload);
             return handleProxyResult(proxyResult);
         }
@@ -296,11 +326,10 @@ export function registerShopifyTools(server: McpServer) {
     server.tool(
         "cartLinesRemove",
         "Removes line items from an existing shopping cart. Uses the Storefront API.",
-        { // Raw shape for input arguments
+        {
             cartId: z.string().describe("The GID of the cart to modify."),
             lineIds: z.array(z.string()).min(1).describe("Array of cart line GIDs to remove."),
         },
-        // { annotations: { readonly: false, destructive: false, idempotent: true } satisfies ToolAnnotations }, // Removed options object
         async ({ cartId, lineIds }) => {
              const mutation = `
                 mutation CartLinesRemove($cartId: ID!, $lineIds: [ID!]!) {
@@ -311,7 +340,7 @@ export function registerShopifyTools(server: McpServer) {
                 }
             `;
             const graphQLPayload = { query: mutation, variables: { cartId, lineIds } };
-            console.error(`[${new Date().toISOString()}] INFO: [tool:cartLinesRemove] Executing for cart ID: ${cartId}`); // Added timestamp
+            console.error(`[${new Date().toISOString()}] INFO: [tool:cartLinesRemove] Executing for cart ID: ${cartId}`);
             const proxyResult = await proxyStorefrontRequest(graphQLPayload);
             return handleProxyResult(proxyResult);
         }
@@ -320,10 +349,9 @@ export function registerShopifyTools(server: McpServer) {
     server.tool(
         "getCart",
         "Fetches the details of an existing shopping cart by its ID. Uses the Storefront API.",
-        { // Raw shape for input arguments
+        {
             cartId: z.string().describe("The GID of the cart to fetch."),
         },
-        // { annotations: { readonly: true } satisfies ToolAnnotations }, // Removed options object
         async ({ cartId }) => {
             const query = `
                 query GetCart($cartId: ID!) {
@@ -356,93 +384,11 @@ export function registerShopifyTools(server: McpServer) {
                 }
             `;
             const graphQLPayload = { query, variables: { cartId } };
-            console.error(`[${new Date().toISOString()}] INFO: [tool:getCart] Executing for cart ID: ${cartId}`); // Added timestamp
+            console.error(`[${new Date().toISOString()}] INFO: [tool:getCart] Executing for cart ID: ${cartId}`);
             const proxyResult = await proxyStorefrontRequest(graphQLPayload);
             return handleProxyResult(proxyResult);
         }
     );
 
-
-    // --- Admin Tools (Conditional) ---
-    if (appConfig.adminApi.enabled) {
-        console.error(`[${new Date().toISOString()}] INFO: Admin API enabled, registering Admin tools.`); // Added timestamp
-
-        server.tool(
-            "getCustomerById",
-            "Retrieves a specific customer using the Admin API.",
-            { // Raw shape for input arguments
-                customerId: z.string().describe("The GID of the customer (e.g., 'gid://shopify/Customer/123')."),
-            },
-            // { annotations: { readonly: true } satisfies ToolAnnotations }, // Removed options object
-            async ({ customerId }) => {
-                const query = `query GetCustomer($id: ID!) { customer(id: $id) { id email firstName lastName phone } }`;
-                const graphQLPayload = { query, variables: { id: customerId } };
-                console.error(`[${new Date().toISOString()}] AUDIT: Executing Admin tool: getCustomerById for ID: ${customerId}`); // Added timestamp
-                const proxyResult = await proxyAdminRequest(graphQLPayload);
-                return handleProxyResult(proxyResult);
-            }
-        );
-
-        // Define Zod schema for ProductInput (simplified example)
-        // A real implementation should match the Admin API schema more closely
-        const ProductInputSchema = z.object({
-            title: z.string().min(1),
-            bodyHtml: z.string().optional(),
-            vendor: z.string().optional(),
-            productType: z.string().optional(),
-            status: z.enum(['ACTIVE', 'ARCHIVED', 'DRAFT']).optional(),
-            // Add other fields like variants, images, options etc. as needed
-        }).passthrough(); // Allow extra fields not explicitly defined
-
-        server.tool(
-            "createProduct",
-            "Creates a new product using the Admin API.",
-            { // Raw shape for input arguments
-                input: ProductInputSchema.describe("The ProductInput object containing product details."),
-            },
-            // { annotations: { readonly: false, destructive: false, idempotent: false } satisfies ToolAnnotations }, // Removed options object
-            async ({ input }) => {
-                 const mutation = `
-                    mutation ProductCreate($input: ProductInput!) {
-                      productCreate(input: $input) {
-                        product {
-                          id
-                          title
-                          handle
-                          vendor
-                          status
-                        }
-                        userErrors {
-                          field
-                          message
-                        }
-                      }
-                    }`;
-                const graphQLPayload = { query: mutation, variables: { input } };
-                console.error(`[${new Date().toISOString()}] AUDIT: Executing Admin tool: createProduct`); // Added timestamp
-                const proxyResult = await proxyAdminRequest(graphQLPayload);
-                return handleProxyResult(proxyResult);
-            }
-        );
-
-        // Example Admin Tool (if needed for testing)
-        server.tool(
-            "exampleAdminTool",
-            "Placeholder for an admin-only tool (expects raw query).",
-            { // Raw shape for input arguments
-                query: z.string().describe("The raw GraphQL query/mutation string."),
-                variables: z.record(z.unknown()).optional().describe("Optional variables for the query."),
-            },
-            // { annotations: { readonly: false, destructive: true, idempotent: false } satisfies ToolAnnotations }, // Removed options object
-            async ({ query, variables }) => {
-                const graphQLPayload = { query, variables };
-                console.error(`[${new Date().toISOString()}] AUDIT: Executing Admin tool: exampleAdminTool with client-provided query`); // Added timestamp
-                const proxyResult = await proxyAdminRequest(graphQLPayload);
-                return handleProxyResult(proxyResult);
-            }
-        );
-
-    } else {
-         console.error(`[${new Date().toISOString()}] INFO: Admin API disabled, skipping Admin tool registration.`); // Added timestamp
-    }
+    // Admin tools section removed
 }

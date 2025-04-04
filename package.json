@@ -33,6 +33,7 @@
   "homepage": "https://github.com/ramakay/ShopifyMockMCP#readme",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.6.1",
+    "axios": "^1.8.4",
     "graphql": "^16.10.0",
     "zod": "^3.24.2"
   },
