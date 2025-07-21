@@ -33,20 +33,15 @@ jobs:
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.1'
-          bundler-cache: false
-          
-      - name: Install dependencies
-        run: |
-          cd docs
-          bundle install
+          bundler-cache: true
+          working-directory: ./docs
           
       - name: Setup Pages
         uses: actions/configure-pages@v5
         
       - name: Build Jekyll site
-        run: |
-          cd docs
-          bundle exec jekyll build --destination ../_site --baseurl "/ShopifyMockMCP"
+        working-directory: ./docs
+        run: bundle exec jekyll build --destination ../_site --baseurl "/ShopifyMockMCP"
         env:
           JEKYLL_ENV: production
           
