@@ -18,79 +18,13 @@ The goal is to enable developers to confidently leverage AI assistance for Shopi
 ## Architecture
 
 ### System Overview
-```mermaid
-%%{init: {'theme':'dark', 'themeVariables': { 'primaryColor':'#FFD700', 'primaryTextColor':'#000', 'primaryBorderColor':'#4169E1', 'lineColor':'#4169E1', 'secondaryColor':'#4169E1', 'tertiaryColor':'#1E90FF', 'background':'#000000', 'mainBkg':'#FFD700', 'secondBkg':'#4169E1', 'tertiaryBkg':'#1E90FF', 'textColor':'#FFD700', 'labelBoxBkgColor':'#000000', 'labelBoxBorderColor':'#FFD700', 'labelTextColor':'#FFD700', 'actorBkg':'#FFD700', 'actorBorder':'#4169E1', 'actorTextColor':'#000', 'actorLineColor':'#4169E1', 'noteBkgColor':'#FFD700', 'noteTextColor':'#000', 'signalColor':'#FFD700', 'signalTextColor':'#000'}}}%%
-
-graph LR
-    Client[MCP Client<br/>Claude/Cursor] --> MCPServer[MCP Server<br/>server.ts]
-    MCPServer --> Tools[Tools Layer<br/>tools.ts]
-    Tools --> Proxy[Shopify Proxy<br/>shopifyProxy.ts]
-    Proxy --> MockShop[mock.shop API]
-    Proxy --> RealStore[Real Store API]
-
-    style Client fill:#FFD700,stroke:#4169E1,stroke-width:2px,color:#000
-    style MCPServer fill:#4169E1,stroke:#FFD700,stroke-width:2px,color:#FFD700
-    style Tools fill:#FFD700,stroke:#4169E1,stroke-width:2px,color:#000
-    style Proxy fill:#4169E1,stroke:#FFD700,stroke-width:2px,color:#FFD700
-    style MockShop fill:#FFD700,stroke:#4169E1,stroke-width:2px,color:#000
-    style RealStore fill:#FFD700,stroke:#4169E1,stroke-width:2px,color:#000
-```
+![System Architecture](architecture.png)
 
 ### Data Flow
-```mermaid
-%%{init: {'theme':'dark', 'themeVariables': { 'primaryColor':'#FFD700', 'primaryTextColor':'#000', 'primaryBorderColor':'#4169E1', 'lineColor':'#4169E1', 'secondaryColor':'#4169E1', 'tertiaryColor':'#1E90FF', 'background':'#000000', 'mainBkg':'#FFD700', 'secondBkg':'#4169E1', 'tertiaryBkg':'#1E90FF', 'textColor':'#FFD700', 'labelBoxBkgColor':'#000000', 'labelBoxBorderColor':'#FFD700', 'labelTextColor':'#FFD700', 'actorBkg':'#FFD700', 'actorBorder':'#4169E1', 'actorTextColor':'#000', 'actorLineColor':'#4169E1', 'noteBkgColor':'#FFD700', 'noteTextColor':'#000', 'signalColor':'#FFD700', 'signalTextColor':'#000'}}}%%
-
-sequenceDiagram
-    participant User
-    participant MCP as MCP Client
-    participant Server as MCP Server
-    participant Tools
-    participant Proxy as Shopify Proxy
-    participant API as Shopify API
-
-    User->>MCP: Request Product Info
-    MCP->>Server: stdio: getProductById
-    Server->>Tools: Execute Tool
-    Tools->>Proxy: GraphQL Query
-    Proxy->>API: POST /graphql
-    API-->>Proxy: Product Data
-    Proxy-->>Tools: Formatted Response
-    Tools-->>Server: Content Blocks
-    Server-->>MCP: Tool Response
-    MCP-->>User: Display Product
-```
+![Data Flow Diagram](dataflow.png)
 
 ### Tool Hierarchy
-```mermaid
-%%{init: {'theme':'dark', 'themeVariables': { 'primaryColor':'#FFD700', 'primaryTextColor':'#000', 'primaryBorderColor':'#4169E1', 'lineColor':'#4169E1', 'secondaryColor':'#4169E1', 'tertiaryColor':'#1E90FF', 'background':'#000000', 'mainBkg':'#FFD700', 'secondBkg':'#4169E1', 'tertiaryBkg':'#1E90FF', 'textColor':'#FFD700', 'labelBoxBkgColor':'#000000', 'labelBoxBorderColor':'#FFD700', 'labelTextColor':'#FFD700', 'actorBkg':'#FFD700', 'actorBorder':'#4169E1', 'actorTextColor':'#000', 'actorLineColor':'#4169E1', 'noteBkgColor':'#FFD700', 'noteTextColor':'#000', 'signalColor':'#FFD700', 'signalTextColor':'#000'}}}%%
-
-graph TD
-    API[Shopify MCP Tools]
-    API --> Shop[Shop Tools]
-    API --> Product[Product Tools]
-    API --> Collection[Collection Tools]
-    API --> Cart[Cart Tools]
-    
-    Shop --> getShopInfo[getShopInfo]
-    
-    Product --> getProductById[getProductById]
-    Product --> findProducts[findProducts]
-    
-    Collection --> getCollectionById[getCollectionById]
-    Collection --> findCollections[findCollections]
-    
-    Cart --> cartCreate[cartCreate]
-    Cart --> cartLinesAdd[cartLinesAdd]
-    Cart --> cartLinesUpdate[cartLinesUpdate]
-    Cart --> cartLinesRemove[cartLinesRemove]
-    Cart --> getCart[getCart]
-
-    style API fill:#4169E1,stroke:#FFD700,stroke-width:2px,color:#FFD700
-    style Shop fill:#FFD700,stroke:#4169E1,stroke-width:2px,color:#000
-    style Product fill:#FFD700,stroke:#4169E1,stroke-width:2px,color:#000
-    style Collection fill:#FFD700,stroke:#4169E1,stroke-width:2px,color:#000
-    style Cart fill:#FFD700,stroke:#4169E1,stroke-width:2px,color:#000
-```
+![Tool Hierarchy](tools-hierarchy.png)
 
 ## Setup & Running Locally
 
