@@ -18,12 +18,18 @@ The goal is to enable developers to confidently leverage AI assistance for Shopi
 ## Architecture
 
 ### System Overview
+The ShopifyMCPMockShop server follows a layered architecture that provides clean separation between MCP protocol handling and Shopify API integration:
+
 ![System Architecture](architecture.png)
 
 ### Data Flow
+This sequence diagram illustrates how a typical request flows through the system, from user interaction to API response:
+
 ![Data Flow Diagram](dataflow.png)
 
 ### Tool Hierarchy
+The MCP server exposes a comprehensive set of tools organized by Shopify resource type:
+
 ![Tool Hierarchy](tools-hierarchy.png)
 
 ## Setup & Running Locally
