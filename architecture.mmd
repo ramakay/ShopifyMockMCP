@@ -1,0 +1,15 @@
+%%{init: {'theme':'dark', 'themeVariables': { 'primaryColor':'#FFD700', 'primaryTextColor':'#000', 'primaryBorderColor':'#4169E1', 'lineColor':'#4169E1', 'secondaryColor':'#4169E1', 'tertiaryColor':'#1E90FF', 'background':'#000000', 'mainBkg':'#FFD700', 'secondBkg':'#4169E1', 'tertiaryBkg':'#1E90FF', 'textColor':'#FFD700', 'labelBoxBkgColor':'#000000', 'labelBoxBorderColor':'#FFD700', 'labelTextColor':'#FFD700', 'actorBkg':'#FFD700', 'actorBorder':'#4169E1', 'actorTextColor':'#000', 'actorLineColor':'#4169E1', 'noteBkgColor':'#FFD700', 'noteTextColor':'#000', 'signalColor':'#FFD700', 'signalTextColor':'#000'}}}%%
+
+graph LR
+    Client[MCP Client<br/>Claude/Cursor] --> MCPServer[MCP Server<br/>server.ts]
+    MCPServer --> Tools[Tools Layer<br/>tools.ts]
+    Tools --> Proxy[Shopify Proxy<br/>shopifyProxy.ts]
+    Proxy --> MockShop[mock.shop API]
+    Proxy --> RealStore[Real Store API]
+
+    style Client fill:#FFD700,stroke:#4169E1,stroke-width:2px,color:#000
+    style MCPServer fill:#4169E1,stroke:#FFD700,stroke-width:2px,color:#FFD700
+    style Tools fill:#FFD700,stroke:#4169E1,stroke-width:2px,color:#000
+    style Proxy fill:#4169E1,stroke:#FFD700,stroke-width:2px,color:#FFD700
+    style MockShop fill:#FFD700,stroke:#4169E1,stroke-width:2px,color:#000
+    style RealStore fill:#FFD700,stroke:#4169E1,stroke-width:2px,color:#000

@@ -38,6 +38,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@mermaid-js/mermaid-cli": "^11.6.0",
     "@types/node": "^20",
     "typescript": "^5"
   },
